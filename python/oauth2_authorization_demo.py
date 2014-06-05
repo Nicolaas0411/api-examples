@@ -1,12 +1,11 @@
 import logging
-import json
 import os
 import sys
 import urlparse
 import webbrowser
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
-
 import requests
+from requests_oauthlib import OAuth2
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -25,6 +24,7 @@ redirect_uri = 'http://localhost.mapmyapi.com:12345/callback'
 authorize_url = 'https://www.mapmyfitness.com/v7.0/oauth2/authorize/?' \
                 'client_id={0}&response_type=code&redirect_uri={1}'.format(
                 CLIENT_ID, redirect_uri)
+
 
 # Set up a basic handler for the redirect issued by the MapMyFitness 
 # authorize page. For any GET request, it simply returns a 200.
@@ -77,3 +77,18 @@ except:
     print 'Did not get JSON. Here is the response and content:'
     print response
     print response.content
+
+# Use the access token to request a resource on behalf of the user
+oauth = OAuth2(client_id=CLIENT_ID, token={'token_type': 'Bearer','access_token': access_token['access_token']})
+activity_type_url = 'https://oauth2-api.mapmyapi.com/v7.0/activity_type/'
+response = requests.get(url=activity_type_url, auth=oauth, verify=False, headers={'Api-Key': CLIENT_ID})
+response.status_code
+
+# Refresh a client's credentials to prevent expiration
+refresh_token_url = 'https://oauth2-api.mapmyapi.com/v7.0/oauth2/access_token/'
+refresh_token_data = {'grant_type': 'refresh_token', 'client_id': CLIENT_ID, 'client_secret': CLIENT_SECRET, 'refresh_token': access_token['refresh_token']}
+response = requests.post(url=refresh_token_url, data=refresh_token_data, headers={'Api-Key': CLIENT_ID})
+refresh_token = response.json()
+oauth = OAuth2(client_id=CLIENT_ID, token={'token_type': 'Bearer','access_token': refresh_token['access_token']})
+response = requests.get(url=activity_type_url, auth=oauth, verify=False, headers={'Api-Key': CLIENT_ID})
+response.status_code
