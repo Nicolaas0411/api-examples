@@ -5,7 +5,6 @@ import urlparse
 import webbrowser
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 import requests
-from requests_oauthlib import OAuth2
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -22,8 +21,7 @@ if CLIENT_ID is None or CLIENT_SECRET is None:
 # As a convenience, localhost.mapmyapi.com redirects to localhost.
 redirect_uri = 'http://localhost.mapmyapi.com:12345/callback'
 authorize_url = 'https://www.mapmyfitness.com/v7.0/oauth2/authorize/?' \
-                'client_id={0}&response_type=code&redirect_uri={1}'.format(
-                CLIENT_ID, redirect_uri)
+                'client_id={0}&response_type=code&redirect_uri={1}'.format(CLIENT_ID, redirect_uri)
 
 
 # Set up a basic handler for the redirect issued by the MapMyFitness 
@@ -35,6 +33,7 @@ class AuthorizationHandler(BaseHTTPRequestHandler):
         self.send_header('Content-Type', 'text/html')
         self.end_headers()
         self.server.path = self.path
+
 
 parsed_redirect_uri = urlparse.urlparse(redirect_uri)
 server_address = parsed_redirect_uri.hostname, parsed_redirect_uri.port
@@ -57,14 +56,42 @@ authorize_code = urlparse.parse_qs(callback_url.query)['code'][0]
 print 'Got an authorize code:', authorize_code
 
 access_token_url = 'https://api.mapmyfitness.com/v7.0/oauth2/access_token/'
-access_token_data = {'grant_type': 'authorization_code', 
+access_token_data = {'grant_type': 'authorization_code',
                      'client_id': CLIENT_ID,
                      'client_secret': CLIENT_SECRET,
                      'code': authorize_code}
 
-response = requests.post(url=access_token_url, 
+response = requests.post(url=access_token_url,
                          data=access_token_data,
                          headers={'Api-Key': CLIENT_ID})
+
+print 'Request details:'
+print 'Content-Type:', response.request.headers['Content-Type']
+print 'Request body:', response.request.body
+
+# retrieve the access_token from the response
+try:
+    access_token = response.json()
+    print 'Got an access token:', access_token
+except:
+    print 'Did not get JSON. Here is the response and content:'
+    print response
+    print response.content
+
+# Use the access token to request a resource on behalf of the user
+activity_type_url = 'https://oauth2-api.mapmyapi.com/v7.0/activity_type/'
+response = requests.get(url=activity_type_url, verify=False,
+                        headers={'api-key': CLIENT_ID, 'authorization': 'Bearer %s' % access_token['access_token']})
+
+# Refresh a client's credentials to prevent expiration
+refresh_token_url = 'https://oauth2-api.mapmyapi.com/v7.0/oauth2/access_token/'
+refresh_token_data = {'grant_type': 'refresh_token',
+                      'client_id': CLIENT_ID,
+                      'client_secret': CLIENT_SECRET,
+                      'refresh_token': access_token['refresh_token']}
+
+response = requests.post(url=refresh_token_url, data=refresh_token_data,
+                         headers={'api-key': CLIENT_ID, 'authorization': 'Bearer %s' % access_token['access_token']})
 
 print 'Request details:'
 print 'Content-Type:', response.request.headers['Content-Type']
@@ -78,17 +105,7 @@ except:
     print response
     print response.content
 
-# Use the access token to request a resource on behalf of the user
-oauth = OAuth2(client_id=CLIENT_ID, token={'token_type': 'Bearer','access_token': access_token['access_token']})
-activity_type_url = 'https://oauth2-api.mapmyapi.com/v7.0/activity_type/'
-response = requests.get(url=activity_type_url, auth=oauth, verify=False, headers={'Api-Key': CLIENT_ID})
-response.status_code
-
-# Refresh a client's credentials to prevent expiration
-refresh_token_url = 'https://oauth2-api.mapmyapi.com/v7.0/oauth2/access_token/'
-refresh_token_data = {'grant_type': 'refresh_token', 'client_id': CLIENT_ID, 'client_secret': CLIENT_SECRET, 'refresh_token': access_token['refresh_token']}
-response = requests.post(url=refresh_token_url, data=refresh_token_data, headers={'Api-Key': CLIENT_ID})
+# Attempt another request on the user's behalf using the token
 refresh_token = response.json()
-oauth = OAuth2(client_id=CLIENT_ID, token={'token_type': 'Bearer','access_token': refresh_token['access_token']})
-response = requests.get(url=activity_type_url, auth=oauth, verify=False, headers={'Api-Key': CLIENT_ID})
-response.status_code
+response = requests.get(url=activity_type_url, verify=False,
+                        headers={'api-key': CLIENT_ID, 'authorization': 'Bearer %s' % access_token['access_token']})
