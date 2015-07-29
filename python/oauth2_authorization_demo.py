@@ -20,11 +20,11 @@ if CLIENT_ID is None or CLIENT_SECRET is None:
 
 # As a convenience, localhost.mapmyapi.com redirects to localhost.
 redirect_uri = 'http://localhost.mapmyapi.com:12345/callback'
-authorize_url = 'https://www.mapmyfitness.com/v7.0/oauth2/authorize/?' \
+authorize_url = 'https://api.mapmyfitness.com/v7.1/oauth2/authorize/?' \
                 'client_id={0}&response_type=code&redirect_uri={1}'.format(CLIENT_ID, redirect_uri)
 
 
-# Set up a basic handler for the redirect issued by the MapMyFitness 
+# Set up a basic handler for the redirect issued by the MapMyFitness
 # authorize page. For any GET request, it simply returns a 200.
 # When run interactively, the request's URL will be printed out.
 class AuthorizationHandler(BaseHTTPRequestHandler):
@@ -55,7 +55,7 @@ authorize_code = urlparse.parse_qs(callback_url.query)['code'][0]
 
 print 'Got an authorize code:', authorize_code
 
-access_token_url = 'https://api.mapmyfitness.com/v7.0/oauth2/access_token/'
+access_token_url = 'https://api.mapmyfitness.com/v7.1/oauth2/access_token/'
 access_token_data = {'grant_type': 'authorization_code',
                      'client_id': CLIENT_ID,
                      'client_secret': CLIENT_SECRET,
@@ -79,12 +79,12 @@ except:
     print response.content
 
 # Use the access token to request a resource on behalf of the user
-activity_type_url = 'https://oauth2-api.mapmyapi.com/v7.0/activity_type/'
+activity_type_url = 'https://api.ua.com/v7.1/activity_type/'
 response = requests.get(url=activity_type_url, verify=False,
                         headers={'api-key': CLIENT_ID, 'authorization': 'Bearer %s' % access_token['access_token']})
 
 # Refresh a client's credentials to prevent expiration
-refresh_token_url = 'https://oauth2-api.mapmyapi.com/v7.0/oauth2/access_token/'
+refresh_token_url = 'https://api.ua.com/v7.1/oauth2/access_token/'
 refresh_token_data = {'grant_type': 'refresh_token',
                       'client_id': CLIENT_ID,
                       'client_secret': CLIENT_SECRET,
